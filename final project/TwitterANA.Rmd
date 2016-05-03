@@ -1,0 +1,368 @@
+---
+title: "Twitter Analysis"
+author: "Chetan Bhandari"
+date: "2 May 2016"
+output: 
+  html_document: 
+    fig_height: 6
+    fig_width: 8
+    theme: cerulean
+---
+
+
+#TWITTER FOLLOWERS PREDICTION
+
+#Final project for Data science syllabus 
+
+#Harvard Extension School
+
+#Problem Statement
+
+Predict the number of follower a user has based on number of tweets, users followed, favorites, geographical location, language, data joined, etc.
+
+#Approach followed here
+
+The Twitter followers are predicted using the following parameters:
+
+1. No. of tweets (statusesCount).
+
+2. No. of favorites (favoritesCount).
+
+3. No. of people he/she is following (friendsCount).
+
+4. The year the user opened the account with Twitter. (created)
+
+5. Language the user operates in, which is predictive of location. (lang)
+
+5. Parameter denoting whether the user is a Company/Organization OR a Celebrity/popular person. This class of users have very large number of followers in contrast to a regular user, therefore its important to record this classification. (cc)
+
+```{r}
+library(readr)
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
+options(scipen=999)
+library(dplyr)
+library(twitteR)
+library(caret)
+library(lubridate)
+library(MASS)
+library(e1071)
+library(readr)
+library(pROC)
+library(randomForest)
+```
+
+####This dataset contains 100k users as got from Twitterdata.rmd. We also initialize the twitter connection using API from library 'twitteR'
+```{r}
+dat <- read_csv("https://raw.githubusercontent.com/cbhandari81/data/master/twitter_s.csv")
+
+Init_twitt <- function() {
+  consumer_key <- "aNTRmMXvPzA86nuKgnW8iAdha"
+consumer_secret <- "WZgtz4LD8aO5ysFp5G7YmNmAb8LJstANlQw88H76rxzzxbrIBy"
+access_token <- "1375379682-kabi92NOLPjVaZnFQPyGIlNcJWjfXtoVFeKoPAc"
+access_secret <- "QCxMASRiUWL2PtgXoENxIsMeH2do2QKSslXGTxkgZzFx0"
+options(httr_oauth_cache=T) #This will enable the use of a local file to cache OAuth access credentials between R sessions.
+setup_twitter_oauth(consumer_key,
+                    consumer_secret,
+                    access_token,
+                    access_secret)
+
+}
+
+Init_twitt()
+```
+
+Following is the snapshot of data. 
+```{r}
+head(dat)
+```
+
+We filter the data we need and the first thing we do is to find the correlation coeff.. 
+```{r}
+#get the attributes we are interested in (Language is catagorical and not numerical, therefore we are not considering that for now) -- 
+tmpk <- data.frame(dat$followersCount, dat$statusesCount, dat$favoritesCount, dat$friendsCount, dat$created) 
+colnames(tmpk) <- c("followersCount", "statusesCount", "favoritesCount", "friendsCount", "created" ) 
+#process the data
+tmpk$created <- as.Date(tmpk$created)
+tmpk$created <- year(tmpk$created)
+tmpk$statusesCount <- as.double(tmpk$statusesCount)
+tmpk$favoritesCount <- as.double(tmpk$favoritesCount)
+tmpk$friendsCount <- as.double(tmpk$friendsCount)
+tmpk$followersCount <- as.double(tmpk$followersCount)
+# Classify Company/Celebrity if the user has followers more than 20 times it has friends , OR if the number of followers are more than 3000.  
+tmpk$cc <- ifelse(tmpk$followersCount > 20*tmpk$friendsCount | tmpk$followersCount > 5000, 1, 0)
+# Eliminate NAs
+tmpk <- na.omit(tmpk)
+
+# Get the correlation coeff.
+cor(tmpk)
+
+```
+
+Its pretty clear from the coeff. that the followersCount is directly proportional to friendsCount and cc.  
+
+The 'created' year is inversely proportional as expected as older accounts will generally have more followers than newer ones. However its not a detrimental factor. 
+
+#Prediction Algorithms
+
+####We are using the following 4 approaches :
+
+1. K Nearest neighbors (knn3)
+
+2. Linear Regression (lm)
+
+3. Random Forest (randomForest)
+
+4. Quadratic Discriminant Analysis
+
+
+### K NEAREST NEIGHBORS
+
+We first get all the parameters that we need in tmpk variable.
+```{r}
+
+calc_knn <- function(interval) {
+tmpk <- data.frame(dat$followersCount, dat$statusesCount, dat$favoritesCount, dat$friendsCount, dat$created , dat$lang)
+colnames(tmpk) <- c("followersCount", "statusesCount", "favoritesCount", "friendsCount", "created", "lang")
+
+tmpk$cc <- ifelse(tmpk$followersCount > 20*tmpk$friendsCount | tmpk$followersCount > 5000, 1, 0)
+tmpk <- na.omit(tmpk)
+
+tmpk$followersCount <- as.factor(tmpk$followersCount)
+tmpk$lang <- substr(tmpk$lang, 1,2)
+tmpk$lang <- as.factor(tmpk$lang)
+tmpk$created <- as.Date(tmpk$created)
+tmpk$created <- year(tmpk$created)
+tmpk$statusesCount <- as.double(tmpk$statusesCount)
+tmpk$favoritesCount <- as.double(tmpk$favoritesCount)
+tmpk$friendsCount <- as.double(tmpk$friendsCount)
+
+inTrain <- createDataPartition(y = tmpk$followersCount, p=0.9)
+train_set <- slice(tmpk, inTrain$Resample1)
+test_set <- slice(tmpk, -inTrain$Resample1)
+
+fit <- knn3(followersCount~., data=train_set, k=5)
+predk <- as.double(predict(fit, newdata = test_set, type = "class"))
+test_set$followersCount <- as.double(test_set$followersCount)
+predk <- ifelse(abs(predk-test_set$followersCount) < interval, test_set$followersCount, predk)
+
+roc_knn <- roc(as.double(test_set$followersCount), predk)
+#plot(roc_knn)
+return(roc_knn$auc)
+}
+
+#func <- function(interval){
+#  return(mean(replicate(5, calc_knn(interval))))
+#}
+
+X <- seq(0,100, 10)
+Y <- sapply(X, calc_knn)
+plot(X,Y, type = "b", ylab = "Accuracy", xlab = "Division Interval", main = "K nearest neighbors")
+
+```
+
+The ROC curve with as-is followersCount will not show much accuracy since the variance is high and no of factors is very large. 
+
+We are therefore using intervals so that the test data is contained and we get better accuracy. Using this method we achieve an average accuracy of 85% for interval = 80.
+
+####Therefore, in other words, there is a 85% accuracy that the KNN prediciton will be within 80 counts of actual followers count.
+
+
+### Linear Regression
+
+The linear regression here is divided into 2 parts. 
+
+1. No. of followers in training data is less than 5000, and
+
+2. Above 5000 followers. 
+
+####1. Less than 5000
+Since, the followers variance is much lesser in category 1, the linear regression fit gives a much higher accuracy. Above 5000 the deviation is much higher and the accuracy is minimal. 
+
+Also, in this dataset the language is quite distributed and there is a possibility that a particular language is present in test set but missing in train set. On account of this we have eliminated language from prediction for large followers.
+
+```{r}
+calc_acc <- function(interval) {
+tmpk <- data.frame(dat$followersCount, dat$statusesCount, dat$favoritesCount, dat$friendsCount, dat$created)
+colnames(tmpk) <- c("followersCount", "statusesCount", "favoritesCount", "friendsCount", "created") 
+# calculate the cc variable as mentioned above.
+tmpk$cc <- ifelse(tmpk$followersCount > 20*tmpk$friendsCount | tmpk$followersCount > 5000, 1, 0)
+# filter the data where the users are no Compnay / Celebrity
+tmpk <- filter(tmpk, cc == 0)
+tmpk <- na.omit(tmpk)
+
+tmpk$created <- as.Date(tmpk$created)
+tmpk$created <- year(tmpk$created)
+
+inTrain <- createDataPartition(y = tmpk$followersCount, p=0.9)
+train_set <- slice(tmpk, inTrain$Resample1)
+test_set <- slice(tmpk, -inTrain$Resample1)
+
+fit <- lm(followersCount~., data = train_set)
+predlm <- round(predict(fit, newdata = test_set) )
+# lot of predictions are negative that actually point to a zero so we amend that
+predlm <- ifelse(predlm<0, 0, predlm)
+
+# here we check for distance with interval
+predlm <- ifelse(abs(predlm-test_set$followersCount) < interval, test_set$followersCount, predlm)
+
+#generate ROC and return the Area Under Curve (auc)
+roc_lm <- roc(response = test_set$followersCount, predictor = predlm)
+return(roc_lm$auc)
+#plot(roc_lm)
+}
+func <- function(interval){
+  return(mean(replicate(5, calc_acc(interval))))
+}
+X <- seq(100, 1000, 100)
+Y <- sapply(X, func)
+# Y values are 
+Y
+plot(X,Y, type = "b", ylab = "Accuracy", xlab = "Division Interval", main = "Linear Regression for regular users")
+
+```
+
+As per ROC data above, at an average there is 80%+ accuracy that the followers count predicted by linear regression above, is within 600 counts of the actual value and ~85% for within 700 counts. 
+
+
+
+####2. More than 5000
+Above 5000 the deviation is much higher and the accuracy is minimal. 
+
+Also, in this dataset the language is quite distributed and there is a possibility that a particular language is present in test set but missing in train set. On account of this we have eliminated language from prediction for large followers.
+
+```{r}
+calc_acc_cc <- function(interval) {
+tmpk <- data.frame(dat$followersCount, dat$statusesCount, dat$favoritesCount, dat$friendsCount, dat$created)
+colnames(tmpk) <- c("followersCount", "statusesCount", "favoritesCount", "friendsCount", "created")
+# calculate the cc variable as mentioned above.
+tmpk$cc <- ifelse(tmpk$followersCount > 20*tmpk$friendsCount | tmpk$followersCount > 5000, 1, 0)
+# filter the data where the users are no Compnay / Celebrity
+tmpk <- filter(tmpk, cc == 1)
+tmpk <- na.omit(tmpk)
+
+tmpk$created <- as.Date(tmpk$created)
+tmpk$created <- year(tmpk$created)
+
+inTrain <- createDataPartition(y = tmpk$followersCount, p=0.9)
+train_set <- slice(tmpk, inTrain$Resample1)
+test_set <- slice(tmpk, -inTrain$Resample1)
+
+fitcc <- lm(followersCount~., data = train_set)
+predlmcc <- round(predict(fitcc, newdata = test_set) )
+predlmcc <- ifelse(predlmcc<0, 0, predlmcc)
+
+predlmcc <- ifelse(abs(predlmcc-test_set$followersCount) < interval, test_set$followersCount, predlmcc)
+# Somehow the ROC was not working for this data set, so had to use a workaround.This is a mean where the predicted data = test data. Note the interval is 20000. 
+return(mean(test_set$followersCount == predlmcc))
+}
+func <- function(interval){
+  return(mean(replicate(5, calc_acc_cc(interval))))
+}
+
+X <- seq(2000, 20000, 2000)
+Y <- sapply(X, func)
+plot(X,Y, type = "b", ylab = "Accuracy", xlab = "Division Interval", main = "Linear Regression for Company/Celebrity")
+
+```
+
+As per data above, at an average there is 80% accuracy, where the followers count predicted by linear regression above, is within 14,000 counts of the actual value. 
+Therefore linear regression will not give a good estimate if the user is a company/group or celebrity/popular.
+
+
+###Random Forest
+
+```{r}
+calc_rfa <- function(interval) {
+tmpk <- data.frame(dat$followersCount, dat$statusesCount, dat$favoritesCount, dat$friendsCount, dat$created , dat$lang)
+colnames(tmpk) <- c("followersCount", "statusesCount", "favoritesCount", "friendsCount", "created", "lang")
+tmpk$cc <- ifelse(tmpk$followersCount > 20*tmpk$friendsCount | tmpk$followersCount > 5000, 1, 0)
+tmpk <- na.omit(tmpk)
+tmpk$lang <- substr(tmpk$lang, 1,2)
+tmpk$lang <- as.factor(tmpk$lang)
+tmpk$created <- as.Date(tmpk$created)
+tmpk$created <- year(tmpk$created)
+# Using temporary data set of 10,000 as the Fit model for RFA becomes very large for 100k users.
+tmpk <- sample_n(tmpk, 1000)
+inTrain <- createDataPartition(y = tmpk$followersCount, p=0.9)
+train_set <- slice(tmpk, inTrain$Resample1)
+test_set <- slice(tmpk, -inTrain$Resample1)
+
+
+fitrfa <- randomForest(formula = followersCount~., data = train_set)
+predrfa <- round(predict(fitrfa, newdata = test_set))
+predrfa <- ifelse(predrfa < 0, 0, predrfa)
+
+predrfa <- ifelse(abs(predrfa-test_set$followersCount) < interval, test_set$followersCount, predrfa)
+rocrfa <- roc(response = test_set$followersCount, predictor = predrfa)
+return(rocrfa$auc)
+#plot(rocrfa)
+}
+
+func <- function(interval){
+  return(mean(replicate(10, calc_rfa(interval))))
+}
+
+X <- seq(10,100, 10)
+Y <- sapply(X, func)
+plot(X,Y, type = "b", ylab = "Accuracy", xlab = "Division Interval", main = "Random Forest")
+
+```
+
+####When using Random forest, the accuracy is around 78% that the predicted followers would be within 50 counts of actual value.
+
+
+### Quadratic Discriminant Analysis
+
+Considering ony Numeric values here.
+```{r}
+calc_qda <- function(interval){
+
+tmpk <- data.frame(dat$followersCount, dat$statusesCount, dat$favoritesCount, dat$friendsCount, dat$created)
+colnames(tmpk) <- c("followersCount", "statusesCount", "favoritesCount", "friendsCount", "created")
+tmpk <- na.omit(tmpk)
+
+tmpk$created <- as.Date(tmpk$created)
+tmpk$created <- year(tmpk$created)
+
+tmpk$followersCount <- as.double(tmpk$followersCount)
+tmpk$statusesCount <- as.double(tmpk$statusesCount)
+tmpk$favoritesCount <- as.double(tmpk$favoritesCount)
+tmpk$friendsCount <- as.double(tmpk$friendsCount)
+
+tmpk$followersCount <- round(tmpk$followersCount/interval)
+tmpk$followersCount <- ifelse(tmpk$followersCount >= 20, 20, tmpk$followersCount)
+
+inTrain <- createDataPartition(y = tmpk$followersCount, p=0.9)
+train_set <- slice(tmpk, inTrain$Resample1)
+test_set <- slice(tmpk, -inTrain$Resample1)
+
+fitqda <- qda(formula = followersCount~., data = train_set)
+predqda <- as.double(predict(fitqda, newdata = test_set)$class)
+predqda <- ifelse(predqda < 0, 0, predqda)
+
+rocqda <- roc(response = test_set$followersCount, predictor = predqda)
+return(rocqda$auc)
+
+}
+X <- seq(1000, 10000, 2000)
+Y <- sapply(X, calc_qda)
+plot(X,Y, type = "b", ylab = "Accuracy", xlab = "Division Interval", main = "Quadratic Discriminant Analysis")
+
+```
+
+As seen above at around 5000, we achieve an 80% accuracy. Therefore QDA will give us an 80% accurate answer with a deviation of 5000 from actual value. Not exactly a good approach to find specific values.
+
+
+#Conclusion
+
+The best appraoches in order of accuracy are : 
+
+1. Random Forest
+
+2. K nearest neighbors
+
+3. Linear Regression
+
+4. Quadratic Discriminant Analysis
+
+----
