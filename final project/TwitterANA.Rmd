@@ -1,5 +1,5 @@
 ---
-title: "Twitter Analysis"
+title: "Twitter Followers Analysis and Prediction"
 author: "Chetan Bhandari"
 date: "2 May 2016"
 output: 
@@ -9,9 +9,6 @@ output:
     theme: cerulean
 ---
 
-
-#TWITTER FOLLOWERS PREDICTION
-
 #Final project for Data science syllabus 
 
 #Harvard Extension School
@@ -20,7 +17,91 @@ output:
 
 Predict the number of follower a user has based on number of tweets, users followed, favorites, geographical location, language, data joined, etc.
 
-#Approach followed here
+#Data Insights
+
+####"twitteR" package
+
+We get the data from Twitter site using the 'twitteR' package of R. Also, the analysis has been done using R programming. 
+
+The twitter API is rate restricted, so it can take a good couple of hours to download 100k users depending on your internet speed. The test data for this experiment can be found here:
+
+"https://raw.githubusercontent.com/cbhandari81/data/master/final%20project/twitter_s_en.csv"
+
+Next we study the data. 
+
+The data that we get from Twitter API using "twitteR" package are:
+
+ [1] "description"               
+ [2] "statusesCount"             
+ [3] "followersCount"   
+ [4] "favoritesCount"          
+ [5] "friendsCount"               
+ [6] "url"              
+ [7] "name"                        
+ [8] "created"                        
+ [9] "protected"        
+[10] "verified"                  
+[11] "screenName"               
+[12] "location"         
+[13] "lang"                       
+[14] "id"                               
+[15] "listedCount"      
+[16] "followRequestSent" 
+[17] "profileImageUrl"  
+
+The variables that are useful in predicting the followers from above are :
+
+[2] statusesCount : Number of tweets by a user.
+[4] favoritesCount : Number of tweets the user has added as favorites. This can give us a picture of his activity trend.  
+[5] friendsCount : Number of other users this user is following
+[8] created : When the account was first created.
+[12] location : Geographical location of a user. However, since very less people have mentioned this in their profiles and also since the value for this can be anything, e.g. Washington, Washing DC, US, NY, SF, SFO, Bangalore, BLR, its quite a job to wrangle this and convert to meaningful locations. We are therefore not considering this variable. 
+[13] lang : Language the user operates in. This is 'EN' only in our dataset.
+'followRequestSent' is FALSE 99% and 'profileImageURL' is nothing but the link to users profile. 
+
+####Initial Findings
+
+There is a good correlation (0.61) between followers and friends. 
+Another interesting part is that the number of tweets the user makes does not have a good correlation with followers. Its only 0.16.  We therefore think that its not only the number of tweets but the subject and sentiment of the tweet also that matters and has an influence on the followers. 
+Created has negative correlation as expected.
+
+####New data and modifications to the data set
+
+The general trend of users is to have more friends than followers, or have similar number. However there is a group of users who have many followers but very less friends. These users are generally either companies/organizations, like Apple, Microsoft, or popular personalities/celebrities like Angelina Jolie, Trump, Pete Sampras (remember him ?) etc.
+
+  Twitter does not have any data that differentiates individual users vs groups, therefore , we created a new variable 'cc'. We set this variable to TRUE or 1 whenever the user has more than 5000 followers, or when the number of followers is more than 20 times the number of friends. Out of 100k users, there were 16.8k users that belonged to this category !
+
+
+#Limitations and tips on how to improve prediction
+
+####The data that we have used for this experiment is for english speaking users only 'en'. For other users the trend might be different. 
+The data from twitter is quite limited, and predicting the followers count from the data Twitter shares publicly, is quite a challenge. For e.g. a user has 100 friends but can have 50 followers, another user can have 100 followers for 100 friends. We have therefore used multiple algorigthms to help predict data. 
+
+When predicting the user's followers, what we feel would be really good to have, to correctly predict are the following : 
+
+1. Type of User : Individual or Organization.
+2. User's recent and past activity in terms of number of logins in the past weeks, month or year. 
+3. Number of tweets and re-tweets. (we have this)
+4. Number of friends or groups that he/she is connected with. (have this again)
+5. Sentiment of users tweets. Positive sentiments will attract more followers. 
+6. Gender. Sometimes this also helps in predicting the trend.  
+7. Also if location can be maintained as city and country, we can use that to categorize as well. This is currently just a string and user can enter anything. Its mostly junk. 
+
+It all depends on kind of people and cause (subject) the user is following and his level of activity on twitter. Number of tweets the user has, seems like a good enough does not have 
+
+#Approaches followed here
+
+We are using the following 4 approaches :
+
+1. K Nearest neighbors (knn3)
+
+2. Linear Regression (lm)
+
+3. Random Forest (randomForest)
+
+4. Quadratic Discriminant Analysis
+
+Since the variance of followers is large, we will be using intervals to predict data. Therefore the algorithm would predict a certain value with an error of <interval value> with a certain % (80% atleast) accuracy. 
 
 The Twitter followers are predicted using the following parameters:
 
@@ -36,24 +117,26 @@ The Twitter followers are predicted using the following parameters:
 
 5. Parameter denoting whether the user is a Company/Organization OR a Celebrity/popular person. This class of users have very large number of followers in contrast to a regular user, therefore its important to record this classification. (cc)
 
+####Check the Conclusions at the bottom of the page
+
 ```{r}
-library(readr)
+suppressMessages(library(readr))
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
 options(scipen=999)
-library(dplyr)
-library(twitteR)
-library(caret)
-library(lubridate)
-library(MASS)
-library(e1071)
-library(readr)
-library(pROC)
-library(randomForest)
+suppressMessages(library(dplyr))
+suppressMessages(library(twitteR))
+suppressMessages(library(caret))
+suppressMessages(library(lubridate))
+suppressMessages(library(MASS))
+suppressMessages(library(e1071))
+suppressMessages(library(readr))
+suppressMessages(library(pROC))
+suppressMessages(library(randomForest))
 ```
 
-####This dataset contains 100k users as got from Twitterdata.rmd. We also initialize the twitter connection using API from library 'twitteR'
+####This dataset contains ~101k users as got from Twitterdata.rmd. We also initialize the twitter connection using API from library 'twitteR'
 ```{r}
-dat <- read_csv("https://raw.githubusercontent.com/cbhandari81/data/master/twitter_s.csv")
+dat <- read_csv("https://raw.githubusercontent.com/cbhandari81/data/master/final%20project/twitter_s_en.csv")
 
 Init_twitt <- function() {
   consumer_key <- "aNTRmMXvPzA86nuKgnW8iAdha"
@@ -78,7 +161,6 @@ head(dat)
 
 We filter the data we need and the first thing we do is to find the correlation coeff.. 
 ```{r}
-#get the attributes we are interested in (Language is catagorical and not numerical, therefore we are not considering that for now) -- 
 tmpk <- data.frame(dat$followersCount, dat$statusesCount, dat$favoritesCount, dat$friendsCount, dat$created) 
 colnames(tmpk) <- c("followersCount", "statusesCount", "favoritesCount", "friendsCount", "created" ) 
 #process the data
@@ -104,32 +186,19 @@ The 'created' year is inversely proportional as expected as older accounts will 
 
 #Prediction Algorithms
 
-####We are using the following 4 approaches :
-
-1. K Nearest neighbors (knn3)
-
-2. Linear Regression (lm)
-
-3. Random Forest (randomForest)
-
-4. Quadratic Discriminant Analysis
-
-
 ### K NEAREST NEIGHBORS
 
 We first get all the parameters that we need in tmpk variable.
 ```{r}
 
 calc_knn <- function(interval) {
-tmpk <- data.frame(dat$followersCount, dat$statusesCount, dat$favoritesCount, dat$friendsCount, dat$created , dat$lang)
-colnames(tmpk) <- c("followersCount", "statusesCount", "favoritesCount", "friendsCount", "created", "lang")
+tmpk <- data.frame(dat$followersCount, dat$statusesCount, dat$favoritesCount, dat$friendsCount, dat$created)
+colnames(tmpk) <- c("followersCount", "statusesCount", "favoritesCount", "friendsCount", "created")
 
 tmpk$cc <- ifelse(tmpk$followersCount > 20*tmpk$friendsCount | tmpk$followersCount > 5000, 1, 0)
 tmpk <- na.omit(tmpk)
 
 tmpk$followersCount <- as.factor(tmpk$followersCount)
-tmpk$lang <- substr(tmpk$lang, 1,2)
-tmpk$lang <- as.factor(tmpk$lang)
 tmpk$created <- as.Date(tmpk$created)
 tmpk$created <- year(tmpk$created)
 tmpk$statusesCount <- as.double(tmpk$statusesCount)
@@ -162,9 +231,9 @@ plot(X,Y, type = "b", ylab = "Accuracy", xlab = "Division Interval", main = "K n
 
 The ROC curve with as-is followersCount will not show much accuracy since the variance is high and no of factors is very large. 
 
-We are therefore using intervals so that the test data is contained and we get better accuracy. Using this method we achieve an average accuracy of 85% for interval = 80.
+We are therefore using intervals so that the test data is contained and we get better accuracy. Using this method we achieve an average accuracy of >80% for interval = 30.
 
-####Therefore, in other words, there is a 85% accuracy that the KNN prediciton will be within 80 counts of actual followers count.
+####Therefore, in other words, there is a 80% accuracy that the KNN prediciton will be within 30 counts of actual followers count and ~90% for interval of 80 counts.
 
 
 ### Linear Regression
@@ -177,8 +246,6 @@ The linear regression here is divided into 2 parts.
 
 ####1. Less than 5000
 Since, the followers variance is much lesser in category 1, the linear regression fit gives a much higher accuracy. Above 5000 the deviation is much higher and the accuracy is minimal. 
-
-Also, in this dataset the language is quite distributed and there is a possibility that a particular language is present in test set but missing in train set. On account of this we have eliminated language from prediction for large followers.
 
 ```{r}
 calc_acc <- function(interval) {
@@ -221,14 +288,13 @@ plot(X,Y, type = "b", ylab = "Accuracy", xlab = "Division Interval", main = "Lin
 
 ```
 
-As per ROC data above, at an average there is 80%+ accuracy that the followers count predicted by linear regression above, is within 600 counts of the actual value and ~85% for within 700 counts. 
+As per ROC data above, at an average there is >80% accuracy that the followers count predicted by linear regression above, is within 400 counts of the actual value and ~90% for within 600 counts. 
 
 
 
 ####2. More than 5000
 Above 5000 the deviation is much higher and the accuracy is minimal. 
 
-Also, in this dataset the language is quite distributed and there is a possibility that a particular language is present in test set but missing in train set. On account of this we have eliminated language from prediction for large followers.
 
 ```{r}
 calc_acc_cc <- function(interval) {
@@ -259,13 +325,13 @@ func <- function(interval){
   return(mean(replicate(5, calc_acc_cc(interval))))
 }
 
-X <- seq(2000, 20000, 2000)
+X <- seq(2000, 40000, 2000)
 Y <- sapply(X, func)
 plot(X,Y, type = "b", ylab = "Accuracy", xlab = "Division Interval", main = "Linear Regression for Company/Celebrity")
 
 ```
 
-As per data above, at an average there is 80% accuracy, where the followers count predicted by linear regression above, is within 14,000 counts of the actual value. 
+As per data above, at an average there is 80% accuracy, where the followers count predicted by linear regression above, is within 30,000 counts of the actual value. 
 Therefore linear regression will not give a good estimate if the user is a company/group or celebrity/popular.
 
 
@@ -273,12 +339,10 @@ Therefore linear regression will not give a good estimate if the user is a compa
 
 ```{r}
 calc_rfa <- function(interval) {
-tmpk <- data.frame(dat$followersCount, dat$statusesCount, dat$favoritesCount, dat$friendsCount, dat$created , dat$lang)
-colnames(tmpk) <- c("followersCount", "statusesCount", "favoritesCount", "friendsCount", "created", "lang")
+tmpk <- data.frame(dat$followersCount, dat$statusesCount, dat$favoritesCount, dat$friendsCount, dat$created)
+colnames(tmpk) <- c("followersCount", "statusesCount", "favoritesCount", "friendsCount", "created")
 tmpk$cc <- ifelse(tmpk$followersCount > 20*tmpk$friendsCount | tmpk$followersCount > 5000, 1, 0)
 tmpk <- na.omit(tmpk)
-tmpk$lang <- substr(tmpk$lang, 1,2)
-tmpk$lang <- as.factor(tmpk$lang)
 tmpk$created <- as.Date(tmpk$created)
 tmpk$created <- year(tmpk$created)
 # Using temporary data set of 10,000 as the Fit model for RFA becomes very large for 100k users.
@@ -308,7 +372,7 @@ plot(X,Y, type = "b", ylab = "Accuracy", xlab = "Division Interval", main = "Ran
 
 ```
 
-####When using Random forest, the accuracy is around 78% that the predicted followers would be within 50 counts of actual value.
+####When using Random forest, the accuracy is around 85% that the predicted followers would be within 40 counts of actual value.
 
 
 ### Quadratic Discriminant Analysis
@@ -350,16 +414,16 @@ plot(X,Y, type = "b", ylab = "Accuracy", xlab = "Division Interval", main = "Qua
 
 ```
 
-As seen above at around 5000, we achieve an 80% accuracy. Therefore QDA will give us an 80% accurate answer with a deviation of 5000 from actual value. Not exactly a good approach to find specific values.
+As seen above at around 7000, we achieve an >80% accuracy. Therefore QDA will give us an 80% accurate answer with a deviation of 7000 from actual value. Not exactly a good approach to find specific values.
 
 
 #Conclusion
 
-The best appraoches in order of accuracy are : 
+The best approaches in order of accuracy are : 
 
-1. Random Forest
+1. K nearest neighbors
 
-2. K nearest neighbors
+2. Random Forest
 
 3. Linear Regression
 

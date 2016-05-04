@@ -20,8 +20,8 @@ library(e1071)
 library(readr)
 library(randomForest)
 
-dat <- read_csv("https://raw.githubusercontent.com/cbhandari81/data/master/twitter_s.csv")
-#"https://raw.githubusercontent.com/cbhandari81/data/master/Twitterdata_s.csv")
+dat <- read_csv("https://raw.githubusercontent.com/cbhandari81/data/master/final%20project/twitter_s_en.csv")
+
 consumer_key <- "aNTRmMXvPzA86nuKgnW8iAdha"
 consumer_secret <- "WZgtz4LD8aO5ysFp5G7YmNmAb8LJstANlQw88H76rxzzxbrIBy"
 access_token <- "1375379682-kabi92NOLPjVaZnFQPyGIlNcJWjfXtoVFeKoPAc"
@@ -38,17 +38,15 @@ setup_twitter_oauth(consumer_key,
 calc_knn3 <- function(uname, cc){
   
   udetails <- getUser(uname)  
-  test_set <- data.frame(udetails$followersCount, udetails$statusesCount, udetails$favoritesCount, udetails$friendsCount, udetails$created , udetails$lang)
+  test_set <- data.frame(udetails$followersCount, udetails$statusesCount, udetails$favoritesCount, udetails$friendsCount, udetails$created)
   
-  tmpk <- data.frame(dat$followersCount, dat$statusesCount, dat$favoritesCount, dat$friendsCount, dat$created , dat$lang)
-  colnames(tmpk) <- c("followersCount", "statusesCount", "favoritesCount", "friendsCount", "created", "lang")
+  tmpk <- data.frame(dat$followersCount, dat$statusesCount, dat$favoritesCount, dat$friendsCount, dat$created )
+  colnames(tmpk) <- c("followersCount", "statusesCount", "favoritesCount", "friendsCount", "created")
   
   tmpk$cc <- ifelse(tmpk$followersCount > 20*tmpk$friendsCount | tmpk$followersCount > 5000, 1, 0)
   tmpk <- na.omit(tmpk)
   
   tmpk$followersCount <- as.factor(tmpk$followersCount)
-  #tmpk$lang <- substr(tmpk$lang, 1,2)
-  tmpk$lang <- as.factor(tmpk$lang)
   tmpk$created <- as.Date(tmpk$created)
   tmpk$created <- year(tmpk$created)
   
@@ -58,10 +56,6 @@ calc_knn3 <- function(uname, cc){
   test_set$cc <- cc
   colnames(test_set) <- colnames(tmpk)
   
-  #test_set$followersCount <- round(test_set$followersCount/2000)
-  #test_set$followersCount <- as.factor(test_set$followersCount)
-  #test_set$lang <- substr(test_set$lang, 1,2)
-  test_set$lang <- as.factor(test_set$lang)
   test_set$created <- as.Date(test_set$created)
   test_set$created <- year(test_set$created)
   test_set$followersCount <- NULL
@@ -74,10 +68,10 @@ calc_knn3 <- function(uname, cc){
 calc_random_forest <- function(uname, cc){
   
   udetails <- getUser(uname)  
-  test_set <- data.frame(udetails$followersCount, udetails$statusesCount, udetails$favoritesCount, udetails$friendsCount, udetails$created)# , udetails$lang)
+  test_set <- data.frame(udetails$followersCount, udetails$statusesCount, udetails$favoritesCount, udetails$friendsCount, udetails$created)
   
-  tmpk <- data.frame(dat$followersCount, dat$statusesCount, dat$favoritesCount, dat$friendsCount, dat$created)# , dat$lang)
-  colnames(tmpk) <- c("followersCount", "statusesCount", "favoritesCount", "friendsCount", "created")#, "lang")
+  tmpk <- data.frame(dat$followersCount, dat$statusesCount, dat$favoritesCount, dat$friendsCount, dat$created)
+  colnames(tmpk) <- c("followersCount", "statusesCount", "favoritesCount", "friendsCount", "created")
   tmpk <- sample_n(tmpk, 1000)
   tmpk$cc <- ifelse(tmpk$followersCount > 20*tmpk$friendsCount | tmpk$followersCount > 5000, 1, 0)
   tmpk <- na.omit(tmpk)
@@ -85,7 +79,6 @@ calc_random_forest <- function(uname, cc){
   tmpk$created <- year(tmpk$created)
   
   test_set$cc <- cc
-  
   colnames(test_set) <- colnames(tmpk)
   fitn <- randomForest(followersCount~., data = tmpk)
   ret <- round(predict(fitn, newdata = test_set)) 
@@ -96,24 +89,22 @@ calc_random_forest <- function(uname, cc){
 calc_lda <- function(uname, ccn){
   
   udetails <- getUser(uname)  
-  test_set <- data.frame(udetails$followersCount, udetails$statusesCount, udetails$favoritesCount, udetails$friendsCount, udetails$created , udetails$lang)
+  test_set <- data.frame(udetails$followersCount, udetails$statusesCount, udetails$favoritesCount, udetails$friendsCount, udetails$created)
   
-  tmpk <- data.frame(dat$followersCount, dat$statusesCount, dat$favoritesCount, dat$friendsCount, dat$created , dat$lang)
-  colnames(tmpk) <- c("followersCount", "statusesCount", "favoritesCount", "friendsCount", "created", "lang")
+  tmpk <- data.frame(dat$followersCount, dat$statusesCount, dat$favoritesCount, dat$friendsCount, dat$created)
+  colnames(tmpk) <- c("followersCount", "statusesCount", "favoritesCount", "friendsCount", "created")
   tmpk$cc <- ifelse(tmpk$followersCount > 20*tmpk$friendsCount | tmpk$followersCount > 5000, 1, 0)
   tmpk <- na.omit(tmpk)
   tmpk <- filter(tmpk, cc == ccn)
-  tmpk$lang <- as.factor(tmpk$lang)
+  
   tmpk$created <- as.Date(tmpk$created)
   tmpk$created <- year(tmpk$created)
   
-  test_set$cc <- ccn
+  test_set$cc <- 0
   colnames(test_set) <- colnames(tmpk)
   
-  test_set$lang <- as.factor(test_set$lang)
   test_set$created <- as.Date(test_set$created)
   test_set$created <- year(test_set$created)
-  test_set$followersCount <- NULL
   
   tmpk$followersCount <- as.double(tmpk$followersCount)
   tmpk$statusesCount <- as.double(tmpk$statusesCount)
@@ -129,17 +120,17 @@ calc_lda <- function(uname, ccn){
 calc_qda <- function(uname, cc){
   
   udetails <- getUser(uname)  
-  test_set <- data.frame(udetails$followersCount, udetails$statusesCount, udetails$favoritesCount, udetails$friendsCount, udetails$created)# , udetails$lang)
+  test_set <- data.frame(udetails$followersCount, udetails$statusesCount, udetails$favoritesCount, udetails$friendsCount, udetails$created)
   
-  tmpk <- data.frame(dat$followersCount, dat$statusesCount, dat$favoritesCount, dat$friendsCount, dat$created)#, dat$lang)
-  colnames(tmpk) <- c("followersCount", "statusesCount", "favoritesCount", "friendsCount", "created")#, "lang")
+  tmpk <- data.frame(dat$followersCount, dat$statusesCount, dat$favoritesCount, dat$friendsCount, dat$created)
+  colnames(tmpk) <- c("followersCount", "statusesCount", "favoritesCount", "friendsCount", "created")
   #tmpk$cc <- ifelse(tmpk$followersCount > 20*tmpk$friendsCount | tmpk$followersCount > 5000, 1, 0)
   tmpk <- na.omit(tmpk)
   #tmpk$lang <- as.factor(tmpk$lang)
   tmpk$created <- as.Date(tmpk$created)
   tmpk$created <- year(tmpk$created)
   
-  #test_set$cc <- 1
+  #test_set$cc <- cc
   colnames(test_set) <- colnames(tmpk)
   
   #test_set$lang <- as.factor(test_set$lang)
@@ -168,31 +159,34 @@ calc_qda <- function(uname, cc){
 ui <- shinyUI(fluidPage(
   
   # Application title
-  titlePanel("Predict Twitter Followers"), 
+  titlePanel("Predict Twitter Followers (at 80% accuracy)"), 
   
   # Sidebar with a slider input for number of bins 
   sidebarLayout(
     
     sidebarPanel(
       textInput("uname", "Enter Twitter User Name"),
-      checkboxInput("cc", "Are you a company or Celebrity ?"),
+      checkboxInput("cc", "Are you a company or Celebrity ? (Check if expected to have more than 5000 followers)"),
       actionButton("predictgo", label = "Predict !!"),
       br(),
       h4("Actual value"),
-      verbatimTextOutput("actv")
+      verbatimTextOutput("actv"),
+      br(),
+      h4("User exists in DB?"),
+      verbatimTextOutput("userdb")
     ), 
     
     mainPanel(
-      h3("KNN Prediction"),
+      h3("KNN Prediction (+-20)"),
       verbatimTextOutput("knn"),
       br(),
-      h3("Random Forest Prediction"),
+      h3("Random Forest Prediction (+-50)"),
       verbatimTextOutput("nbp"),
       br(),
-      h3("Linear Regression Prediction"),
+      h3("Linear Regression Prediction (+-400, cc:+-30000)"),
       verbatimTextOutput("ldap"),
       br(),
-      h3("Quadratic Discriminant Prediction (sd=1000)"),
+      h3("Quadratic Discriminant Prediction (+-7000)"),
       verbatimTextOutput("qdap")
     )
   )
@@ -204,6 +198,10 @@ server <- shinyServer(function(input, output) {
   
   actv <- eventReactive(input$predictgo, {
     getUser(input$uname)$followersCount
+  })
+  
+  userdb <- eventReactive(input$predictgo, {
+    ifelse(any(tolower(dat$screenName) == tolower(input$uname)) == TRUE, "YES", "NO")
   })
   
   knn <- eventReactive(input$predictgo, {
@@ -258,6 +256,8 @@ server <- shinyServer(function(input, output) {
   }) 
   
   output$actv <- renderText({ actv() })
+  
+  output$userdb <- renderText({ userdb() })
 })
 
 # Run the application 

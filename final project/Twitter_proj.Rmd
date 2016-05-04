@@ -1,6 +1,6 @@
 ---
 title: "Get Twitter Data"
-author: "user Bhandari"
+author: "Chetan Bhandari"
 date: "24 April 2016"
 output: 
   html_document: 
@@ -33,7 +33,7 @@ setup_twitter_oauth(consumer_key,
                     access_token,
                     access_secret)
 
-knownuser <- getUser("chetan_sap")
+knownuser <- getUser("CHETAN_SAP")
 user_followers_ids <- knownuser$getFollowers(retryOnRateLimit=180)
 
 user_followers_ids_df = rbindlist(lapply(user_followers_ids,as.data.frame))

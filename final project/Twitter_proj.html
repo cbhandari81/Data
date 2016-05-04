@@ -9,7 +9,7 @@
 <meta name="generator" content="pandoc" />
 
 
-<meta name="author" content="user Bhandari" />
+<meta name="author" content="Chetan Bhandari" />
 
 <meta name="date" content="2016-04-24" />
 
@@ -117,7 +117,7 @@ $(document).ready(function () {
 
 
 <h1 class="title toc-ignore">Get Twitter Data</h1>
-<h4 class="author"><em>user Bhandari</em></h4>
+<h4 class="author"><em>Chetan Bhandari</em></h4>
 <h4 class="date"><em>24 April 2016</em></h4>
 
 </div>
@@ -159,7 +159,7 @@ setup_twitter_oauth(consumer_key,
                     access_token,
                     access_secret)</code></pre>
 <pre><code>## [1] &quot;Using direct authentication&quot;</code></pre>
-<pre class="r"><code>knownuser &lt;- getUser(&quot;chetan_sap&quot;)
+<pre class="r"><code>knownuser &lt;- getUser(&quot;CHETAN_SAP&quot;)
 user_followers_ids &lt;- knownuser$getFollowers(retryOnRateLimit=180)
 
 user_followers_ids_df = rbindlist(lapply(user_followers_ids,as.data.frame))
